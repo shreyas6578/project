@@ -112,26 +112,34 @@ except Exception as e:
     from nltk.tag import UnigramTagger
     tagger = UnigramTagger(model='universal')
     print("Using universal tagger as fallback")
-# Dummy skill set – in practice use a skills list or ontology like ESCO/SkillNer
-known_skills = ['python', 'java', 'c++', 'react', 'tensorflow', 'git', 'docker', 'sql', 'excel']
+
 def skill_match_section(resume_skills):
     st.subheader("🔗 Skill–Job Matching")
+    
+    # Text area for job description
     jd = st.text_area("Paste Job Description for skill matching", height=150)
-    if not jd:
-        st.info("Paste a job description above to see your match score.")
-        return
-    # extract & compute
-    jd_skills = extract_skills_from_jd(jd)
-    score, matched, missing = compute_skill_match(resume_skills, jd_skills)
-    # display
-    st.metric("Match Score", f"{score}%")
-    st.success(f"✅ Matched: {', '.join(matched) or 'None'}")
-    st.warning(f"❌ Missing: {', '.join(missing) or 'None'}")
-    # bar chart only if there are any JD skills
-    if jd_skills:
-        fig, ax = plt.subplots()
-        ax.bar(["Matched", "Missing"], [len(matched), len(missing)])
-        st.pyplot(fig)
+    
+    # Add matching button
+    if st.button("✨ Analyze Skill Match"):
+        if not jd:
+            st.info("Please paste a job description first")
+            return
+        
+        with st.spinner("Analyzing skill match..."):
+            jd_skills = extract_skills_from_jd(jd)
+            score, matched, missing = compute_skill_match(resume_skills, jd_skills)
+            
+            # Display results
+            st.metric("Match Score", f"{score}%")
+            st.success(f"✅ Matched: {', '.join(matched) or 'None'}")
+            st.warning(f"❌ Missing: {', '.join(missing) or 'None'}")
+            
+            if jd_skills:
+                fig, ax = plt.subplots()
+                ax.bar(["Matched", "Missing"], [len(matched), len(missing)])
+                st.pyplot(fig)
+            else:
+                st.warning("No skills detected in the job description")
 
 def extract_skills_from_jd(text):
     try:
@@ -169,30 +177,55 @@ def compute_skill_match(resume_skills, job_skills):
         missing = []
         
         # Normalize skills
-        resume_skills = [s.lower().strip() for s in resume_skills]
-        job_skills = [s.lower().strip() for s in job_skills]
+        resume_skills = [str(s).lower().strip() for s in resume_skills]
+        job_skills = [str(s).lower().strip() for s in job_skills]
         
-        # Create similarity matrix
-        similarity_matrix = np.zeros((len(job_skills), len(resume_skills)))
+        # Create similarity matrix with type safety
+        similarity_matrix = np.zeros((len(job_skills), len(resume_skills)), dtype=np.float16)
         
+        # Calculate similarity scores
         for j, j_skill in enumerate(job_skills):
             for r, r_skill in enumerate(resume_skills):
                 similarity_matrix[j][r] = fuzz.token_set_ratio(j_skill, r_skill)
         
-        # Find best matches
+        # Find matches using threshold
         for j, j_skill in enumerate(job_skills):
             max_sim = np.max(similarity_matrix[j])
-            if max_sim > 75:  # Threshold adjusted for better accuracy
+            if max_sim > 75:
                 matched.append(j_skill)
             else:
                 missing.append(j_skill)
         
-        score = int((len(matched) / len(job_skills)) * 100) if job_skills else 0
+        # Calculate score safely
+        score = int((len(matched) / len(job_skills) * 100)) if job_skills else 0
+        
+        # Update session state with successful results
+        st.session_state.last_successful_match = {
+            'score': score,
+            'matched': matched,
+            'missing': missing
+        }
+        
         return score, matched, missing
     
     except Exception as e:
-        st.error(f"Matching error: {str(e)}")
+        st.error(f"Match analysis error: {str(e)}")
+        
+        # Return last successful results if available
+        if 'last_successful_match' in st.session_state:
+            st.warning("Showing last successful analysis results")
+            return (
+                st.session_state.last_successful_match['score'],
+                st.session_state.last_successful_match['matched'],
+                st.session_state.last_successful_match['missing']
+            )
+        
         return 0, [], []
+    
+    except Exception as e:
+        st.error(f"Matching error: {str(e)}")
+        return 0, [], []  # Return defaults without closing outputs
+    
 # ----------------- Helper Functions -----------------
 def generate_docx(text):
     """Convert text to DOCX format"""
@@ -201,8 +234,6 @@ def generate_docx(text):
     bio = io.BytesIO()
     doc.save(bio)
     return bio.getvalue()
-
-
 
 def generate_docx(text):
     """Convert text to DOCX format"""
@@ -725,5 +756,6 @@ def run():
                     st.warning("Insufficient numerical data for correlation heatmap")
             else:
                 st.error("Invalid credentials")
+   
 if __name__ == '__main__':
     run()
