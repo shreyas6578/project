@@ -1,4 +1,4 @@
-google-generativeai==1.0.0
+google-generativeai
 language-tool-python==2.5.0
 matplotlib==3.4.2
 nltk==3.6.3
