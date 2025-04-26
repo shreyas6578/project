@@ -1,4 +1,4 @@
-# Standard Library Imports
+# ========== Standard Libraries ==========
 import os
 import io
 import re
@@ -7,85 +7,53 @@ import json
 import base64
 import random
 import string
+import logging
+import zipfile
 import datetime
 from html import escape
+import urllib.request
 
-# Data Processing & Analysis
+# ========== Data Processing & Analysis ==========
 import numpy as np
 import pandas as pd
 from rapidfuzz import fuzz
 
-# Natural Language Processing - MUST COME FIRST
+# ========== NLTK Setup & NLP Tools ==========
 import nltk
-
-# Configure NLTK data path
-nltk_dir = os.path.join(os.path.expanduser("~"), "nltk_data")
-os.makedirs(nltk_dir, exist_ok=True)
-nltk.data.path.append(nltk_dir)
-
-# Download required NLTK resources with comprehensive fallbacks
-def setup_nltk():
-    required_resources = [
-        ('punkt', 'tokenizers/punkt'),
-        ('averaged_perceptron_tagger', 'taggers/averaged_perceptron_tagger'),
-        ('averaged_perceptron_tagger_eng', 'taggers/averaged_perceptron_tagger_eng'),  # Explicitly added
-        ('stopwords', 'corpora/stopwords'),
-        ('wordnet', 'corpora/wordnet')
-    ]
-    
-    for resource, path in required_resources:
-        try:
-            # First try normal download
-            nltk.download(resource, quiet=True)
-            print(f"Successfully downloaded {resource}")
-        except Exception as e:
-            print(f"Error downloading {resource}: {e}")
-            try:
-                # Fallback to direct download to specified directory
-                nltk.download(resource, download_dir=nltk_dir, quiet=True)
-                print(f"Downloaded {resource} to {nltk_dir}")
-            except Exception as e2:
-                print(f"Critical error downloading {resource}: {e2}")
-                if resource == 'averaged_perceptron_tagger_eng':
-                    # Special handling for this problematic resource
-                    try:
-                        import urllib.request
-                        url = "https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/taggers/averaged_perceptron_tagger.zip"
-                        dest = os.path.join(nltk_dir, "taggers", "averaged_perceptron_tagger_eng.zip")
-                        os.makedirs(os.path.dirname(dest), exist_ok=True)
-                        urllib.request.urlretrieve(url, dest)
-                        print("Manually downloaded averaged_perceptron_tagger_eng")
-                    except Exception as e3:
-                        print(f"Failed manual download: {e3}")
-                        raise RuntimeError(f"Could not obtain required NLTK resource: {resource}")
-
-setup_nltk()
-
-# Now import NLTK components after ensuring resources are available
 from nltk.tokenize import word_tokenize
-from nltk.tag import pos_tag
-from nltk.corpus import stopwords
+from nltk.tag import pos_tag, PerceptronTagger
+from nltk.corpus import stopwords, wordnet
 
-# Rest of your imports...
+# ========== Grammar & Readability ==========
 import language_tool_python
 import textstat
+
+# ========== PDF, DOCX, Resume Parsing ==========
 from pdfminer.layout import LAParams
 from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer.converter import TextConverter
 from pyresparser import ResumeParser
 from docx import Document
+
+# ========== Database & API ==========
 import requests
 import pymysql
+
+# ========== Media & Visualization ==========
 import pafy
 import matplotlib.pyplot as plt
 import plotly.express as px
+from PIL import Image
+
+# ========== Streamlit UI ==========
 import streamlit as st
 from streamlit_tags import st_tags
-from PIL import Image
+
+# ========== Generative AI ==========
 import google.generativeai as genai
 
-# Local Imports
+# ========== Local Imports ==========
 from Courses import (
     ds_kw, ml_kw, web_kw, fullstack_kw, android_kw, ios_kw, uiux_kw,
     devops_kw, qa_kw, dataeng_kw, cloud_kw, biz_analytics_kw, cybersec_kw,
@@ -97,21 +65,12 @@ from Courses import (
     resume_videos, interview_videos
 )
 
-# Initialize grammar tool
-tool = language_tool_python.LanguageTool("en-US")
+# ========== Configure Logging ==========
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+import language_tool_python
+tool = language_tool_python.LanguageTool('en-US')
 
-# Final verification
-try:
-    # Test if POS tagger works
-    from nltk.tag import PerceptronTagger
-    tagger = PerceptronTagger()
-    print("POS tagger initialized successfully")
-except Exception as e:
-    print(f"POS tagger initialization failed: {e}")
-    # Fallback to universal tagger
-    from nltk.tag import UnigramTagger
-    tagger = UnigramTagger(model='universal')
-    print("Using universal tagger as fallback")
 
 def skill_match_section(resume_skills):
     st.subheader("🔗 Skill–Job Matching")
@@ -209,7 +168,8 @@ def compute_skill_match(resume_skills, job_skills):
         return score, matched, missing
     
     except Exception as e:
-        st.error(f"Match analysis error: {str(e)}")
+        # Show error but keep previous outputs
+        st.error(f"Match analysis error: {str(e)}", icon="⚠️")
         
         # Return last successful results if available
         if 'last_successful_match' in st.session_state:
@@ -220,12 +180,8 @@ def compute_skill_match(resume_skills, job_skills):
                 st.session_state.last_successful_match['missing']
             )
         
+        # Return empty results if no previous successful match exists
         return 0, [], []
-    
-    except Exception as e:
-        st.error(f"Matching error: {str(e)}")
-        return 0, [], []  # Return defaults without closing outputs
-    
 # ----------------- Helper Functions -----------------
 def generate_docx(text):
     """Convert text to DOCX format"""
