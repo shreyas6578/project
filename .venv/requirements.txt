@@ -11,3 +11,4 @@ requests
 streamlit
 streamlit-tags
 textstat
+rapidfuzz
