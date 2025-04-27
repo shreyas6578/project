@@ -130,36 +130,44 @@ def extract_skills_from_jd(text):
         st.error(f"Skill extraction error: {str(e)}")
         return []
 
+# At top-level, before any UI code runs, initialize a default in session_state:
+if 'last_successful_match' not in st.session_state:
+    st.session_state['last_successful_match'] = {
+        'score': 0,
+        'matched': [],
+        'missing': []
+    }
+
 def compute_skill_match(resume_skills, job_skills):
+    # Normalize skills
+    resume_skills_norm = [str(s).lower().strip() for s in resume_skills]
+    job_skills_norm    = [str(s).lower().strip() for s in job_skills]
+    
     try:
+        # Build similarity matrix
+        similarity_matrix = np.zeros(
+            (len(job_skills_norm), len(resume_skills_norm)),
+            dtype=np.float16
+        )
+        
+        for j, j_skill in enumerate(job_skills_norm):
+            for r, r_skill in enumerate(resume_skills_norm):
+                similarity_matrix[j, r] = fuzz.token_set_ratio(j_skill, r_skill)
+        
+        # Determine matches and missing based on threshold
         matched = []
         missing = []
-        
-        # Normalize skills
-        resume_skills = [str(s).lower().strip() for s in resume_skills]
-        job_skills = [str(s).lower().strip() for s in job_skills]
-        
-        # Create similarity matrix with type safety
-        similarity_matrix = np.zeros((len(job_skills), len(resume_skills)), dtype=np.float16)
-        
-        # Calculate similarity scores
-        for j, j_skill in enumerate(job_skills):
-            for r, r_skill in enumerate(resume_skills):
-                similarity_matrix[j][r] = fuzz.token_set_ratio(j_skill, r_skill)
-        
-        # Find matches using threshold
-        for j, j_skill in enumerate(job_skills):
-            max_sim = np.max(similarity_matrix[j])
-            if max_sim > 75:
+        for j, j_skill in enumerate(job_skills_norm):
+            if np.max(similarity_matrix[j]) > 75:
                 matched.append(j_skill)
             else:
                 missing.append(j_skill)
         
-        # Calculate score safely
-        score = int((len(matched) / len(job_skills) * 100)) if job_skills else 0
+        # Calculate percentage score
+        score = int(len(matched) / len(job_skills_norm) * 100) if job_skills_norm else 0
         
-        # Update session state with successful results
-        st.session_state.last_successful_match = {
+        # **IMPORTANT** Update session_state only on success
+        st.session_state['last_successful_match'] = {
             'score': score,
             'matched': matched,
             'missing': missing
@@ -168,20 +176,12 @@ def compute_skill_match(resume_skills, job_skills):
         return score, matched, missing
     
     except Exception as e:
-        # Show error but keep previous outputs
-        st.error(f"Match analysis error: {str(e)}", icon="⚠️")
-        
-        # Return last successful results if available
-        if 'last_successful_match' in st.session_state:
-            st.warning("Showing last successful analysis results")
-            return (
-                st.session_state.last_successful_match['score'],
-                st.session_state.last_successful_match['matched'],
-                st.session_state.last_successful_match['missing']
-            )
-        
-        # Return empty results if no previous successful match exists
-        return 0, [], []
+        # On error, log and fall back to the last successful results
+        st.error(f"Match analysis error: {e}", icon="⚠️")
+        st.warning("Displaying last successful results.")
+        prev = st.session_state['last_successful_match']
+        return prev['score'], prev['matched'], prev['missing']
+
 # ----------------- Helper Functions -----------------
 def generate_docx(text):
     """Convert text to DOCX format"""
@@ -357,23 +357,39 @@ def highlight_issues(text, suggestions):
     return html
 
 # ----------------- Database Setup -----------------
+# You can also set these as environment variables if you want (recommended for production)
+# Connect to Railway Public URL (from MYSQL_PUBLIC_URL)
+connection = pymysql.connect(
+    host='gondola.proxy.rlwy.net',   # from your MYSQL_PUBLIC_URL
+    port=50642,                      # from your MYSQL_PUBLIC_URL
+    user='root',                     # from your MYSQL_PUBLIC_URL
+    password='HHqNMMLYXYyToeXRWZzddddCGiJWLkmZ',  # from your MYSQL_PUBLIC_URL
+    database='railway'               # from your MYSQL_PUBLIC_URL
+)
 
-db_pass = os.getenv('DB_PASS', 'admin')
-connection = pymysql.connect(host='localhost', user='root', password=db_pass, db='cv')
 cursor = connection.cursor()
 
-# Ensure table exists
-table_sql = (
-    "CREATE TABLE IF NOT EXISTS user_data ("
-    "ID INT AUTO_INCREMENT PRIMARY KEY,"
-    "Name VARCHAR(255), Email_ID VARCHAR(255), resume_score VARCHAR(8),"
-    "Timestamp VARCHAR(50), Page_no VARCHAR(5), Predicted_Field TEXT,"
-    "User_level TEXT, Actual_skills TEXT, Recommended_skills TEXT, Recommended_courses TEXT"
-    ");"
-)
-cursor.execute("CREATE DATABASE IF NOT EXISTS CV;")
-cursor.execute("USE CV;")
-cursor.execute(table_sql)
+# Example: create table
+cursor.execute("""
+               CREATE TABLE IF NOT EXISTS user_data (
+                                                        ID INT AUTO_INCREMENT PRIMARY KEY,
+                                                        Name VARCHAR(255),
+                   Email_ID VARCHAR(255),
+                   resume_score VARCHAR(8),
+                   Timestamp VARCHAR(50),
+                   Page_no VARCHAR(5),
+                   Predicted_Field TEXT,
+                   User_level TEXT,
+                   Actual_skills TEXT,
+                   Recommended_skills TEXT,
+                   Recommended_courses TEXT
+                   );
+               """)
+
+connection.commit()
+
+
+print("Connected and Table created!")
 
 # ----------------- Main App -----------------
 
@@ -600,7 +616,7 @@ def run():
                 
                 # 6) Persist data
                 timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-                cursor.execute(
+                with connection.cursor() as cursor: cursor.execute(
                     "INSERT INTO user_data "
                     "(Name,Email_ID,resume_score,Timestamp,Page_no,Predicted_Field,User_level,Actual_skills,Recommended_skills,"
                     "Recommended_courses) "
