@@ -12,4 +12,6 @@ streamlit
 streamlit-tags
 textstat
 rapidfuzz
-python-docx
+pafy
+plotly
+python-docx==0.8.11
