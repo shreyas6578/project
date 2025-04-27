@@ -12,14 +12,14 @@ import zipfile
 import datetime
 from html import escape
 import urllib.request
-
+import nltk
+nltk.download('stopwords')
 # ========== Data Processing & Analysis ==========
 import numpy as np
 import pandas as pd
 from rapidfuzz import fuzz
 
 # ========== NLTK Setup & NLP Tools ==========
-import nltk
 from nltk.tokenize import word_tokenize
 from nltk.tag import pos_tag, PerceptronTagger
 from nltk.corpus import stopwords, wordnet
