@@ -68,8 +68,6 @@ from Courses import (
 # ========== Configure Logging ==========
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-import language_tool_python
-tool = language_tool_python.LanguageTool('en-US')
 
 
 def skill_match_section(resume_skills):
@@ -323,19 +321,32 @@ def course_recommender(course_list):
     return rec
 
 
-def grammar_and_spelling_suggestions(text, max_issues=20):
-    matches = tool.check(text)
+def grammar_and_spelling_suggestions_languagetool(text):
+    url = "https://api.languagetool.org/v2/check"
+    params = {
+        "text": text,
+        "language": "en-US",
+    }
+    response = requests.post(url, data=params)
+    
+    if response.status_code != 200:
+        raise Exception(f"LanguageTool API error: {response.status_code}")
+    
+    data = response.json()
     suggestions = []
-    for m in matches[:max_issues]:
+    
+    for match in data['matches']:
+        start = match['offset']
+        end = match['offset'] + match['length']
         suggestions.append({
-            'offset': m.offset,
-            'length': m.errorLength,
-            'message': m.message,
-            'corrections': m.replacements,
-            'context': m.context,
+            'offset': start,
+            'length': end - start,
+            'message': match['message'],
+            'corrections': [repl['value'] for repl in match['replacements']],
+            'context': text[start-20:end+20],  # Show context around the error
         })
+    
     return suggestions
-
 
 def compute_readability(text):
     return {
@@ -429,16 +440,21 @@ def run():
                 resume_text = raw.lower()
                 
                 # 2) Grammar & Readability
+              
                 st.subheader("📘 Grammar & Readability Suggestions")
+                # 1. Readability analysis
                 st.json(compute_readability(raw))
+                
+                # 2. Grammar Suggestions
                 st.markdown("**🔍 Grammar Suggestions:**")
-                suggestions = grammar_and_spelling_suggestions(raw)
+                suggestions = grammar_and_spelling_suggestions_languagetool(raw)
+                
                 if suggestions:
                     st.markdown(highlight_issues(raw, suggestions), unsafe_allow_html=True)
                 else:
                     st.success("✅ No grammar issues found!")
-                
-                # 3) Basic Info & Level
+                    
+               # 3) Basic Info & Level
                 st.header("**Resume Analysis**")
                 st.success(f"Hello {resume_data.get('name','Candidate')}!")
                 st.text(f"Email: {resume_data.get('email','N/A')}")
