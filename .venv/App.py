@@ -15,6 +15,7 @@ from html import escape
 import urllib.request
 import nltk
 nltk.download('stopwords')
+nltk.download('punkt')
 # ========== Data Processing & Analysis ==========
 import numpy as np
 import pandas as pd
