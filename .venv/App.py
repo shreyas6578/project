@@ -1,3 +1,4 @@
+
 # ========== Standard Libraries ==========
 import os
 import io
@@ -421,18 +422,18 @@ def run():
         pdf_file = st.file_uploader("Upload PDF Resume", type=["pdf"] )
 
 
-    if pdf_file:
-        with st.spinner("Processing..."):
-            time.sleep(1)
-        
-        # Create directory if it doesn't exist
-        upload_dir = 'Uploaded_Resumes'
-        os.makedirs(upload_dir, exist_ok=True)  # <-- This line added
-        
-        save_path = os.path.join(upload_dir, pdf_file.name)
-        with open(save_path, 'wb') as f:
-            f.write(pdf_file.getbuffer())
-                
+        if pdf_file:
+            with st.spinner("Processing..."):
+                time.sleep(1)
+            
+            # Create directory if it doesn't exist
+            upload_dir = 'Uploaded_Resumes'
+            os.makedirs(upload_dir, exist_ok=True)  # <-- This is the critical fix
+            
+            save_path = os.path.join(upload_dir, pdf_file.name)
+            with open(save_path, 'wb') as f:
+                f.write(pdf_file.getbuffer())
+            
             show_pdf(save_path)
             resume_data = ResumeParser(save_path).get_extracted_data()
             
