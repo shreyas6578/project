@@ -404,13 +404,11 @@ print("Connected and Table created!")
 
 # ----------------- Main App -----------------
 
-st.set_page_config(page_title="AI Resume Analyzer", page_icon='./Logo/logo2.png')
 
 
 def run():
     # Header
-    img = Image.open('./Logo/logo2.png')
-    st.image(img)
+
     st.title("AI Resume Analyzer")
     
     # Sidebar choice
