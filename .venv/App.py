@@ -406,6 +406,7 @@ print("Connected and Table created!")
 
 
 
+
 def run():
     # Header
 
@@ -418,14 +419,20 @@ def run():
     if mode == 'User':
         st.markdown("<h5 style='color:#053fff;'>Upload your resume for analysis 👔</h5>", unsafe_allow_html=True)
         pdf_file = st.file_uploader("Upload PDF Resume", type=["pdf"] )
+
+
+    if pdf_file:
+        with st.spinner("Processing..."):
+            time.sleep(1)
         
-        if pdf_file:
-            with st.spinner("Processing..."):
-                time.sleep(1)
-            save_path = os.path.join('Uploaded_Resumes', pdf_file.name)
-            with open(save_path, 'wb') as f:
-                f.write(pdf_file.getbuffer())
-            
+        # Create directory if it doesn't exist
+        upload_dir = 'Uploaded_Resumes'
+        os.makedirs(upload_dir, exist_ok=True)  # <-- This line added
+        
+        save_path = os.path.join(upload_dir, pdf_file.name)
+        with open(save_path, 'wb') as f:
+            f.write(pdf_file.getbuffer())
+                
             show_pdf(save_path)
             resume_data = ResumeParser(save_path).get_extracted_data()
             
