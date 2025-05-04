@@ -17,6 +17,4 @@ plotly
 python-docx==0.8.11
 youtube-dl
 yt-dlp
-# Explicit spacy + model (critical for your OSError)
-spacy==3.7.4
-https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0-py3-none-any.whl
+pyresparser 
