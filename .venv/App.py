@@ -72,6 +72,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+import spacy
+try:
+    _ = spacy.load("en_core_web_sm")
+except:
+    import os
+    os.system("python -m spacy download en_core_web_sm")
+nltk.download("all")
+
 def skill_match_section(resume_skills):
     st.subheader("🔗 Skill–Job Matching")
     
